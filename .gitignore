@@ -1,0 +1,14 @@
+# Build output (rebuilt by compressor-native/build.sh)
+.build/
+.xcode-derived/
+bin/
+dist/
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Local tooling settings
+.claude/

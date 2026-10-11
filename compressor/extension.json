@@ -1,0 +1,57 @@
+{
+  "apiVersion": 1,
+  "id": "com.ahmadjerow.compressor",
+  "name": "Compressor",
+  "version": "1.0.0",
+  "description": "Compress images, videos, PDFs and other files without visible quality loss. Originals are kept next to the compressed copies.",
+  "author": "Ahmad Jerow",
+  "entrypoint": "index.js",
+  "commands": [
+    {
+      "id": "compress",
+      "title": "Compress Files",
+      "subtitle": "Images, videos, PDFs and files, saved to a folder you choose",
+      "keywords": ["compress"],
+      "systemImage": "arrow.down.right.and.arrow.up.left",
+      "form": {
+        "title": "Compress Files",
+        "description": "Compressed copies are saved to the destination folder together with a copy of each original.",
+        "submitLabel": "Compress",
+        "fields": [
+          {
+            "id": "files",
+            "type": "files",
+            "label": "Files to compress",
+            "description": "Images, videos, PDFs, documents or folders.",
+            "required": true,
+            "allowsDirectories": true,
+            "maximumSelection": 100
+          },
+          {
+            "id": "destination",
+            "type": "file",
+            "label": "Destination folder",
+            "description": "Where the compressed files and the originals are saved.",
+            "required": true,
+            "allowsDirectories": true,
+            "allowedFileTypes": ["public.folder"]
+          },
+          {
+            "id": "openFolder",
+            "type": "toggle",
+            "label": "Open destination folder when done",
+            "defaultValue": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "open-folder",
+      "title": "Open Compressor Destination Folder",
+      "subtitle": "Show the last destination folder in Finder",
+      "keywords": ["compressopen"],
+      "systemImage": "folder"
+    }
+  ],
+  "capabilities": ["userSelectedFiles", "persistentStorage"]
+}

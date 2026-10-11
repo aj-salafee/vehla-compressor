@@ -1,0 +1,19 @@
+{
+  "apiVersion": 1,
+  "id": "com.ahmadjerow.hello-world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "The simplest possible Vehla extension.",
+  "author": "Ahmad Jerow",
+  "entrypoint": "index.js",
+  "commands": [
+    {
+      "id": "greet",
+      "title": "Say Hello",
+      "subtitle": "Show a greeting",
+      "keywords": ["hello"],
+      "systemImage": "hand.wave.fill"
+    }
+  ],
+  "capabilities": []
+}
