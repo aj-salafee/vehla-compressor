@@ -1,9 +1,0 @@
-{
-  "name": "vehla-compressor",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@vehla/store-sdk": "file:../sdk/typescript"
-  }
-}

@@ -64,9 +64,7 @@ The tests use real files and the real tools. Two are opt-in: a large-file test (
 | Folder | What it is |
 |---|---|
 | `compressor-native/` | The Compressor: a SwiftUI Liquid Glass workspace for Vehla |
-| `compressor/` | An earlier version built as a standard Vehla extension (JavaScript, 15-second limit per run) |
-| `hello-world/` | The minimal first extension, kept as a starting point |
-| `sdk/` | Copies of Vehla's Swift and TypeScript SDKs that the packages build against |
+| `sdk/` | Copies of Vehla's SDKs. `compressor-native` builds against the Swift one (`sdk/swift`) |
 
 ## Tested
 
