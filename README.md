@@ -72,8 +72,8 @@ The tests use real files and the real tools. Two are opt-in: a large-file test (
 
 Verified on real files, including a 4.5 GB video (about 12.5 minutes) and a 500-page, 1.4 GB PDF. Larger single images and very large batches have not been tested.
 
-## Credits and licence
+## Licence and credits
+
+Compressor is released under the [MIT licence](LICENSE). Copyright (c) 2026 Ahmad Jerow.
 
 The SDKs in `sdk/` come from [ibuhs/vehla-extensions](https://github.com/ibuhs/vehla-extensions) and are used under its MIT licence (see `sdk/swift/LICENSE`).
-
-No licence has been chosen yet for the rest of this project.
