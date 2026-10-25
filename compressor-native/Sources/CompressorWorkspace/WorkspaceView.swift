@@ -36,14 +36,16 @@ struct CompressorWorkspaceView: View {
         VStack(spacing: 16) {
             header
             dependencyBanner
+            batchProgress
             if model.items.isEmpty { dropZone } else { fileList }
-            qualityCard
+            optionsCard
             destinationCard
             noticeBanner
             footer
         }
         .animation(.smooth, value: model.notice)
         .animation(.smooth, value: model.missingRequired)
+        .animation(.smooth, value: model.phase)
         .padding(22)
     }
 
@@ -145,14 +147,23 @@ struct CompressorWorkspaceView: View {
     @ViewBuilder private func detail(_ item: FileItem) -> some View {
         switch item.state {
         case .pending:
-            Text("\(item.kind.label) · \(Format.bytes(item.size))").font(.caption).foregroundStyle(secondary)
+            Text("\(item.typeLabel) · \(Format.bytes(item.size))").font(.caption).foregroundStyle(secondary)
         case .working(let value):
-            ProgressView(value: value).tint(Brand.sky).frame(maxWidth: 220)
+            GlassProgressBar(value: value, height: 6)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 2)
         case .done(let result):
             switch result.status {
             case .compressed:
                 Text("\(Format.bytes(result.before)) → \(Format.bytes(result.after))")
                     .font(.caption.monospacedDigit()).foregroundStyle(secondary)
+                if let message = result.message {
+                    Text(message).font(.caption).foregroundStyle(secondary).lineLimit(2)
+                }
+                if let note = result.trashNote {
+                    Label(note, systemImage: result.movedToTrash ? "trash" : "info.circle")
+                        .font(.caption).foregroundStyle(secondary).lineLimit(2)
+                }
             case .failed:
                 Text(result.message ?? "Failed").font(.caption).foregroundStyle(.red).lineLimit(3)
             default:
@@ -165,6 +176,16 @@ struct CompressorWorkspaceView: View {
         switch item.state {
         case .pending:
             if model.phase != .running {
+                if item.isDirectory {
+                    Picker("Folder", selection: Binding(get: { item.folderMode },
+                                                        set: { model.setFolderMode(item.id, $0) })) {
+                        ForEach(FolderMode.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    .help("Zip the folder as one file, or compress every file inside it")
+                }
                 Button { model.remove(item.id) } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.plain).foregroundStyle(secondary)
             }
@@ -247,10 +268,34 @@ struct CompressorWorkspaceView: View {
         .glassCard(cornerRadius: 16, tint: Brand.blue, strength: 0.20)
     }
 
-    // MARK: Quality
+    // MARK: Batch progress
 
-    private var qualityCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    @ViewBuilder private var batchProgress: some View {
+        if model.phase == .running {
+            let counts = model.runCounts
+            let percent = Int((model.overallProgress * 100).rounded(.down))
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Compressing").font(.callout.weight(.semibold))
+                    Text("\(counts.done) of \(counts.total) done").font(.caption).foregroundStyle(secondary)
+                    Spacer()
+                    Text("\(percent)%")
+                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .contentTransition(.numericText(value: Double(percent)))
+                        .animation(.smooth, value: percent)
+                }
+                GlassProgressBar(value: model.overallProgress, height: 10)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .glassCard(cornerRadius: 20, tint: Brand.blue, strength: 0.24)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    // MARK: Options
+
+    private var optionsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Quality").font(.caption).foregroundStyle(secondary)
                 Spacer()
@@ -262,8 +307,25 @@ struct CompressorWorkspaceView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .frame(maxWidth: .infinity)
-            .disabled(model.phase == .running)
+
+            HStack(spacing: 18) {
+                Toggle(isOn: Binding(get: { model.fastVideo }, set: { model.setFastVideo($0) })) {
+                    Label("Fast video", systemImage: "bolt.fill")
+                }
+                .help("Use the Mac's hardware encoder: about 6x faster, with somewhat larger video files")
+                Toggle(isOn: Binding(get: { model.trashOriginals }, set: { model.setTrashOriginals($0) })) {
+                    Label("Move originals to Trash", systemImage: "trash")
+                        .foregroundStyle(model.trashOriginals ? Color.orange : Color.primary)
+                }
+                .help("After each file is compressed and its copy verified, move the original to the Trash")
+                Spacer(minLength: 0)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .font(.callout)
+            .tint(Brand.blue)
         }
+        .disabled(model.phase == .running)
         .padding(.horizontal, 16).padding(.vertical, 12)
         .glassCard(cornerRadius: 20, tint: Brand.indigo, strength: 0.22)
     }
