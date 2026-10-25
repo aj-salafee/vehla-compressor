@@ -40,6 +40,39 @@ struct EngineOptions: Sendable {
     }
 }
 
+/// Lets the window stop one row's jobs mid-batch without stopping the rest.
+final class BatchControl: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stopped: Set<UUID> = []
+    private var running: [Int: (owner: UUID, task: Task<CompressionResult, Never>)] = [:]
+
+    func isStopped(_ owner: UUID) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return stopped.contains(owner)
+    }
+
+    /// Skips the row's queued jobs and cancels the ones already running.
+    func stop(_ owner: UUID) {
+        lock.lock()
+        stopped.insert(owner)
+        let tasks = running.values.filter { $0.owner == owner }.map(\.task)
+        lock.unlock()
+        tasks.forEach { $0.cancel() }
+    }
+
+    fileprivate func register(_ index: Int, owner: UUID, task: Task<CompressionResult, Never>) {
+        lock.lock()
+        let alreadyStopped = stopped.contains(owner)
+        if !alreadyStopped { running[index] = (owner, task) }
+        lock.unlock()
+        if alreadyStopped { task.cancel() }
+    }
+
+    fileprivate func unregister(_ index: Int) {
+        lock.lock(); running[index] = nil; lock.unlock()
+    }
+}
+
 enum BatchRunner {
     /// Images, PDFs and zips that may run at the same time. Video gets its own
     /// lane, one at a time, because the encoder already uses every core.
@@ -48,14 +81,20 @@ enum BatchRunner {
     static func run(
         _ units: [WorkUnit],
         options: EngineOptions,
+        control: BatchControl = BatchControl(),
         progress: @escaping @Sendable (Int, Double) -> Void,
         finished: @escaping @Sendable (Int, CompressionResult) async -> Void
     ) async {
         let work: @Sendable (Int) async -> Void = { index in
             let unit = units[index]
+            guard !control.isStopped(unit.owner) else { return }
             progress(index, 0)
-            let result = await options.engine(for: unit.destination)
-                .compress(unit.source, isDirectory: unit.isDirectory) { progress(index, $0) }
+            let engine = options.engine(for: unit.destination)
+            let job = Task { await engine.compress(unit.source, isDirectory: unit.isDirectory) { progress(index, $0) } }
+            control.register(index, owner: unit.owner, task: job)
+            let result = await withTaskCancellationHandler { await job.value } onCancel: { job.cancel() }
+            control.unregister(index)
+            guard !control.isStopped(unit.owner) else { return }
             await finished(index, result)
         }
         let videos = units.indices.filter { units[$0].isVideo }

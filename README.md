@@ -7,6 +7,7 @@ Compress images, videos, PDFs and other files from inside [Vehla](https://github
 ## Features
 
 - **Drag and drop, or pick files.** Images, videos, PDFs, documents and folders, in batches.
+- **Change your mind any time.** The ⓧ on each row removes it before, during or after compressing. During a batch it stops just that item; files already saved are kept.
 - **Fast batches.** Images, PDFs and zips are compressed up to four at a time (about 3x faster on a batch of photos), while videos run one at a time alongside them.
 - **Folders your way.** For each folder, choose **Zip folder** (one lossless archive) or **Compress each file**, which compresses every file inside and recreates the folder's structure in the destination.
 - **Original kept.** Every compressed file is saved in your destination folder beside an untouched copy of the original. Name clashes become `name (1).ext`, so nothing is overwritten.

@@ -116,6 +116,7 @@ final class CompressorModel: ObservableObject {
     private let confirmTrash: () -> Bool
     private let trashAction: @Sendable (URL) throws -> Void
     private var task: Task<Void, Never>?
+    private var control = BatchControl()
     /// Held while a batch runs so the Mac doesn't idle-sleep mid-compression.
     private var keepAwake: NSObjectProtocol?
 
@@ -211,10 +212,16 @@ final class CompressorModel: ObservableObject {
         }
     }
 
+    /// Removes a row at any time. During a batch it also stops that row's
+    /// work; files already saved in the destination are kept.
     func remove(_ id: FileItem.ID) {
-        guard phase != .running else { return }
         notice = nil
+        if phase == .running, runIDs.contains(id) {
+            control.stop(id)
+            runIDs.removeAll { $0 == id }
+        }
         items.removeAll { $0.id == id }
+        if items.isEmpty, phase == .finished { phase = .idle }
     }
 
     func setFolderMode(_ id: FileItem.ID, _ mode: FolderMode) {
@@ -323,6 +330,8 @@ final class CompressorModel: ObservableObject {
         unitOwners = []; unitSizes = []; unitProgress = []; unitResults = [:]; ownerUnits = [:]
         for item in work { setState(item.id, .working(0)) }
         CompressionEngine.resetNameReservations()
+        let control = BatchControl()
+        self.control = control
         keepAwake = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .userInitiated],
             reason: "Compressing files"
@@ -349,7 +358,7 @@ final class CompressorModel: ObservableObject {
             guard !Task.isCancelled else { model.finish(); return }
 
             await BatchRunner.run(
-                units, options: options,
+                units, options: options, control: control,
                 progress: { index, value in Task { @MainActor in model.unitProgressed(index, value) } },
                 finished: { index, result in await model.unitFinished(index, result) }
             )

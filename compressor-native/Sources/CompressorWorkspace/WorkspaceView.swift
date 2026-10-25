@@ -116,7 +116,9 @@ struct CompressorWorkspaceView: View {
         VStack(spacing: 10) {
             ScrollView {
                 VStack(spacing: 8) {
-                    ForEach(model.items) { item in row(item) }
+                    ForEach(model.items) { item in
+                        row(item).transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    }
                 }
                 .padding(2)
             }
@@ -186,11 +188,11 @@ struct CompressorWorkspaceView: View {
                     .fixedSize()
                     .help("Zip the folder as one file, or compress every file inside it")
                 }
-                Button { model.remove(item.id) } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(secondary)
+                removeButton(item, help: "Remove from the list")
             }
         case .working(let value):
             Text("\(Int(value * 100))%").font(.callout.monospacedDigit()).foregroundStyle(secondary)
+            removeButton(item, help: "Stop and remove from the list")
         case .done(let result):
             switch result.status {
             case .compressed:
@@ -203,7 +205,18 @@ struct CompressorWorkspaceView: View {
             default:
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.sky)
             }
+            removeButton(item, help: "Remove from the list. Files already saved are kept.")
         }
+    }
+
+    private func removeButton(_ item: FileItem, help: String) -> some View {
+        Button { withAnimation(.smooth) { model.remove(item.id) } } label: {
+            Image(systemName: "xmark.circle.fill").font(.title3)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(secondary)
+        .help(help)
+        .accessibilityLabel("Remove \(item.name)")
     }
 
     // MARK: Missing tools
