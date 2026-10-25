@@ -44,7 +44,13 @@ iPhone videos with spatial audio (Apple's APAC codec) keep that audio unchanged,
 
 - To build it yourself: Xcode with Swift 6 or later.
 
+## Download
+
+Get the latest package from [Releases](https://github.com/aj-salafee/vehla-compressor/releases/latest): no Xcode needed. The release notes explain how to install it, including one Terminal command to clear macOS's download flag (the package isn't notarised by Apple).
+
 ## Build and install
+
+To build it yourself instead:
 
 ```sh
 cd compressor-native
