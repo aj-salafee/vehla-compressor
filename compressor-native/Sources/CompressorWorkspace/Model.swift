@@ -117,6 +117,8 @@ final class CompressorModel: ObservableObject {
     private let trashAction: @Sendable (URL) throws -> Void
     private var task: Task<Void, Never>?
     private var control = BatchControl()
+    /// The Trash setting the running batch was started with; the live toggle may differ.
+    private var runTrashOriginals = false
     /// Held while a batch runs so the Mac doesn't idle-sleep mid-compression.
     private var keepAwake: NSObjectProtocol?
 
@@ -332,6 +334,7 @@ final class CompressorModel: ObservableObject {
         CompressionEngine.resetNameReservations()
         let control = BatchControl()
         self.control = control
+        runTrashOriginals = trashOriginals
         keepAwake = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled, .userInitiated],
             reason: "Compressing files"
@@ -428,10 +431,19 @@ final class CompressorModel: ObservableObject {
             return
         }
         var combined = FolderExpansion.aggregate(results, fileCount: indices.count)
-        // Every file went to the Trash: the folder is now empty, so tidy it away too.
-        if trashOriginals, combined.movedToTrash, results.count == indices.count,
-           FolderExpansion.stats(of: item.url).files == 0 {
-            if (try? trashAction(item.url)) != nil { combined.trashNote = "Original folder moved to the Trash." }
+        // Every mirrored file went to the Trash. The folder itself may follow
+        // only if nothing the mirror never received is still inside it.
+        if runTrashOriginals, combined.movedToTrash, results.count == indices.count {
+            let left = FolderExpansion.leftovers(in: item.url)
+            if left.isEmpty {
+                if (try? trashAction(item.url)) != nil { combined.trashNote = "Original folder moved to the Trash." }
+            } else {
+                let names = left.prefix(3).map(\.lastPathComponent).joined(separator: ", ")
+                let more = left.count > 3 ? " and \(left.count - 3) more" : ""
+                combined.trashNote = (combined.trashNote.map { $0 + " " } ?? "")
+                    + "Folder kept: it still has \(left.count) item\(left.count == 1 ? "" : "s") that wasn't copied (\(names)\(more))."
+                    .replacingOccurrences(of: "items that wasn't", with: "items that weren't")
+            }
         }
         setState(owner, .done(combined))
     }

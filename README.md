@@ -15,7 +15,7 @@ Compress images, videos, PDFs and other files from inside [Vehla](https://github
 - **Quality presets.** Smaller, Balanced (the default, visually lossless) and Best quality.
 - **Animated progress.** Each item and the whole batch get a glowing progress bar with a slider-style thumb, with the total space saved shown when done.
 - **Fast video (optional).** Uses the Mac's hardware encoder: about 6x faster, with files roughly 8-28% larger at the same visual quality. Falls back to the standard encoder automatically if needed.
-- **Move originals to Trash (optional, off by default).** After a file is compressed, its copy in the destination is checked byte for byte before the original is moved to the Trash. Originals are never touched when the destination is their own folder.
+- **Move originals to Trash (optional, off by default).** After a file is compressed, its copy in the destination is checked byte for byte before the original is moved to the Trash. A file that changed while it was being compressed (still downloading, syncing or recording) is kept and flagged, and a folder is only trashed once nothing remains in it that wasn't copied, such as hidden files. Originals are never touched when the destination is their own folder.
 - **Free-space check** before a batch starts, so a big job doesn't fail halfway.
 - **Keeps your Mac awake** while a batch is running.
 - **Missing-tool check.** If a required Homebrew tool isn't installed, the window says what's missing and gives you the install command.
