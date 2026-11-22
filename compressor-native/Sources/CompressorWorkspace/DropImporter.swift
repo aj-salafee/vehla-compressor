@@ -1,4 +1,6 @@
+import AVFoundation
 import Foundation
+import ImageIO
 import UniformTypeIdentifiers
 
 /// Turns whatever was dropped on the window into a file that stays put until
@@ -136,12 +138,53 @@ enum DropImporter {
             return withExtension(suggested)
         }
 
-        // TODO(Ahmad): choose the fallback name for a dropped file that has no human name.
-        // Today: "Photo 2026-11-22 at 03.15.42.jpeg". See the notes in the chat for the options.
+        // No human name anywhere: name it after when it was taken, as the
+        // photo's own metadata records it, so a batch sorts in shooting order.
+        // Files without a capture date (screenshots, exports) use the drop time.
+        // Same-second names never clash: the destination adds " (1)".
+        let kind = (type ?? UTType(filenameExtension: ext))?.conforms(to: .audiovisualContent) == true ? "Video" : "Photo"
+        let when = captureDate(of: url, type: type) ?? Date()
         let stamp = DateFormatter()
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        let kind = (type ?? UTType(filenameExtension: ext))?.conforms(to: .movie) == true ? "Video" : "Photo"
-        return withExtension("\(kind) \(stamp.string(from: Date()))")
+        return withExtension("\(kind) \(stamp.string(from: when))")
+    }
+
+    /// When a photo or video was taken, read from the file's own metadata.
+    static func captureDate(of url: URL, type: UTType?) -> Date? {
+        let type = type ?? UTType(filenameExtension: url.pathExtension)
+        if type?.conforms(to: .audiovisualContent) == true { return videoCreationDate(url) }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        guard let text = (exif?[kCGImagePropertyExifDateTimeOriginal] ?? exif?[kCGImagePropertyExifDateTimeDigitized]
+                          ?? tiff?[kCGImagePropertyTIFFDateTime]) as? String else { return nil }
+        // EXIF stores the camera's wall-clock time with no zone, which is what the name should show.
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return parser.date(from: text)
+    }
+
+    /// The general creation date, else any dated metadata item, such as the
+    /// iPhone's com.apple.quicktime.creationdate, which keeps its time zone.
+    private static func videoCreationDate(_ url: URL) -> Date? {
+        final class Box: @unchecked Sendable { var date: Date? }
+        let box = Box()
+        let done = DispatchSemaphore(value: 0)
+        // Called from drop callbacks on background threads; detached so it never needs the main thread.
+        Task.detached {
+            let asset = AVURLAsset(url: url)
+            if let item = try? await asset.load(.creationDate), let date = try? await item.load(.dateValue) {
+                box.date = date
+            } else {
+                for item in (try? await asset.load(.metadata)) ?? [] {
+                    if let date = try? await item.load(.dateValue) { box.date = date; break }
+                }
+            }
+            done.signal()
+        }
+        return done.wait(timeout: .now() + 5) == .success ? box.date : nil
     }
 }

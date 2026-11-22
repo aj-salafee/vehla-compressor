@@ -1,3 +1,4 @@
+import ImageIO
 import UniformTypeIdentifiers
 import VehlaNativeUISDK
 import XCTest
@@ -149,6 +150,53 @@ final class DropImportTests: XCTestCase {
         XCTAssertFalse(fallback.contains("uuid="), fallback)
         XCTAssertEqual((fallback as NSString).pathExtension, "jpeg")
         XCTAssertEqual(DropImporter.fileName(for: URL(fileURLWithPath: "/tmp/x/Holiday.png"), suggestedName: nil, type: .png), "Holiday.png")
+    }
+
+    func testNamelessPhotoIsNamedAfterWhenItWasTaken() throws {
+        // A JPEG carrying EXIF DateTimeOriginal, as a camera or iPhone writes it.
+        let file = try dir("drop").appendingPathComponent("uuid=9C49&code=001&library=1.jpeg")
+        let context = try XCTUnwrap(CGContext(data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 0,
+                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        let image = try XCTUnwrap(context.makeImage())
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(file as CFURL, UTType.jpeg.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyExifDictionary: [
+            kCGImagePropertyExifDateTimeOriginal: "2024:07:14 18:42:05",
+        ]] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+
+        XCTAssertEqual(DropImporter.fileName(for: file, suggestedName: "uuid=9C49&code=001", type: .jpeg),
+                       "Photo 2024-07-14 at 18.42.05.jpeg")
+    }
+
+    func testNamelessVideoIsNamedAfterWhenItWasTaken() async throws {
+        let ffmpeg = try XCTUnwrap(Tools.find("ffmpeg"))
+        let file = try dir("drop").appendingPathComponent("uuid=DA56&code=001.mov")
+        // The iPhone's own tag, which keeps the local time zone it was shot in.
+        _ = await runProcess(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30", "-t", "1",
+                                      "-c:v", "libx264", "-movflags", "use_metadata_tags",
+                                      "-metadata", "com.apple.quicktime.creationdate=2024-07-14T18:42:05-0400", file.path])
+        let name = DropImporter.fileName(for: file, suggestedName: nil, type: .quickTimeMovie)
+        let expected = DateFormatter()
+        expected.locale = Locale(identifier: "en_US_POSIX")
+        expected.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let taken = try XCTUnwrap(ISO8601DateFormatter().date(from: "2024-07-14T18:42:05-04:00"))
+        XCTAssertEqual(name, "Video \(expected.string(from: taken)).mov")
+    }
+
+    func testPhotoWithoutACaptureDateUsesTheDropTime() throws {
+        let file = try dir("drop").appendingPathComponent("uuid=02C9&code=001.png")
+        let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 0,
+                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(file as CFURL, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+
+        let stamp = DateFormatter()
+        stamp.locale = Locale(identifier: "en_US_POSIX")
+        stamp.dateFormat = "yyyy-MM-dd 'at' HH.mm"
+        let name = DropImporter.fileName(for: file, suggestedName: nil, type: .png)
+        XCTAssertTrue(name.hasPrefix("Photo \(stamp.string(from: Date()))"), name)
+        XCTAssertTrue(name.hasSuffix(".png"), name)
     }
 
     // MARK: The engine's safety net
